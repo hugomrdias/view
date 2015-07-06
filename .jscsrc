@@ -1,0 +1,16 @@
+{
+    "preset": "airbnb",
+
+    "validateIndentation": 4,
+    "requirePaddingNewLinesAfterUseStrict": true,
+
+    "requirePaddingNewLinesAfterBlocks": {
+        "allExcept": ["inCallExpressions"]
+    },
+
+    "excludeFiles": [
+        "node_modules/**",
+        "build/**",
+        "app/scripts/vendor/**"
+    ]
+}
