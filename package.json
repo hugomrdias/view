@@ -11,6 +11,7 @@
   "dependencies": {
     "browser-sync": "^2.7.13",
     "browserify": "^10.2.4",
+    "fastdom": "^0.8.6",
     "gulp": "^3.9.0",
     "gulp-notify": "^2.2.0",
     "gulp-sourcemaps": "^1.5.2",
@@ -22,5 +23,8 @@
     "vinyl-buffer": "^1.0.0",
     "vinyl-source-stream": "^1.1.0",
     "watchify": "^3.2.3"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.0"
   }
 }

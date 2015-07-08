@@ -5,40 +5,549 @@ var _  = require('lodash');
 var inherits = require('inherits');
 var View = require('./view.js');
 
+/*
+ *	Observe
+ */
+ var observer = new MutationObserver(function(mutations) {
+	// For the sake of...observation...let's output the mutation to console to see how this all works
+	mutations.forEach(function(mutation) {
+		var removed = mutation.removedNodes;
+		var added = mutation.addedNodes;
+
+		if(removed.length > 0 ){
+			console.log('Remove : ', mutation.target, removed.length, removed)
+		}
+
+		if(added.length > 0 ){
+			console.log('Add : ' , mutation.target, added.length, added)
+		}
+		//console.log(mutation);
+	});    
+});
+ 
+// Notify me of everything!
+var observerConfig = {
+	attributes: false, 
+	childList: true, 
+	characterData: false,
+	subtree: true 
+};
+ 
+// Node, config
+// In this case we'll listen to all changes to body and child nodes
+var targetNode = document.getElementById('app');
+//observer.observe(targetNode, observerConfig);
+
+// Sub view 1
 function Content() {
     View.apply(this, arguments);
 }
 
 inherits(Content, View);
 Content.prototype.template = '<div>Content</div>';
-var content = new Content({force:true});
+//var content = new Content({id: 'content'});
 
+// subview 2
 function Content2() {
     View.apply(this, arguments);
 }
 
 inherits(Content2, View);
 Content2.prototype.template = '<div>Content2</div>';
-var content2 = new Content2({force:false});
+//var content2 = new Content2({id: 'content2'});
 
-var view = new View();
+// Main View 
+function Main(options){
+	View.apply(this, arguments);
+	this.count = 0;
+	this.number = options.number;
+}
+inherits(Main, View);
+Main.prototype.data = function() {
+	var count = this.count += 1;
+	return {
+            top: Math.sin(count / 10) * 10,
+            left: Math.cos(count / 10) * 10,
+            color: (count) % 255,
+            content: count % 100,
+            number : this.number
+        }
+};
+Main.prototype.template = document.getElementById('template').textContent;
 
-view.region(content, '#region');
-view.region(content2, '#region');
-view.attach(document.getElementById('app'));
+// SETUP
+var boxes;
+var container = document.getElementById('app');
+var legend = document.getElementById('timing');
+var init = function() {
+    boxes = _.map(_.range(100), function(i) {
+        var box = new Main({number: i});
+        box.attach(container);
+        return box;
+    });
+};
 
-// view.region(content, '#region');
 
-setInterval(function() {
+var animate = function() {
+    for (var i = 0, l = boxes.length; i < l; i++) {
+      boxes[i].refresh();
+    }
+};
+
+
+window.timeout = null;
+window.totalTime = null;
+window.loopCount = null;
+var update = function() {
+    var startDate = new Date();
+    for (var i = 0, l = boxes.length; i < l; i++) {
+       boxes[i].refresh();
+    }
+    var endDate = new Date();
+    totalTime += endDate - startDate;
+    loopCount++;
+    if (loopCount % 20 === 0) {
+        legend.textContent = 'Performed ' + loopCount + ' iterations in ' + totalTime + ' ms (average ' + (totalTime / loopCount).toFixed(2) + ' ms per loop).';
+    }
+    window.requestAnimationFrame(update);
+};
+
+
+init();
+window.requestAnimationFrame(update);
+
+//var view = new Main({number: 0});
+
+//view.region(content2, '#region');
+//view.attach(document.getElementById('app'));
+//view.region(content, '#region');
+
+/*setTimeout(function() {
     view.refresh();
-}, 1000)
+}, 1000)*/
 
-// setTimeout(function(){
-//     view.remove();
-// }, 4000);
+//var region = document.getElementById('region');
 
+//region.removeChild(region.firstChild);
+},{"./view.js":5,"inherits":3,"lodash":4}],2:[function(require,module,exports){
+/**
+ * FastDom
+ *
+ * Eliminates layout thrashing
+ * by batching DOM read/write
+ * interactions.
+ *
+ * @author Wilson Page <wilsonpage@me.com>
+ */
 
-},{"./view.js":4,"inherits":2,"lodash":3}],2:[function(require,module,exports){
+;(function(fastdom){
+
+  'use strict';
+
+  // Normalize rAF
+  var raf = window.requestAnimationFrame
+    || window.webkitRequestAnimationFrame
+    || window.mozRequestAnimationFrame
+    || window.msRequestAnimationFrame
+    || function(cb) { return window.setTimeout(cb, 1000 / 60); };
+
+  /**
+   * Creates a fresh
+   * FastDom instance.
+   *
+   * @constructor
+   */
+  function FastDom() {
+    this.frames = [];
+    this.lastId = 0;
+
+    // Placing the rAF method
+    // on the instance allows
+    // us to replace it with
+    // a stub for testing.
+    this.raf = raf;
+
+    this.batch = {
+      hash: {},
+      read: [],
+      write: [],
+      mode: null
+    };
+  }
+
+  /**
+   * Adds a job to the
+   * read batch and schedules
+   * a new frame if need be.
+   *
+   * @param  {Function} fn
+   * @public
+   */
+  FastDom.prototype.read = function(fn, ctx) {
+    var job = this.add('read', fn, ctx);
+    var id = job.id;
+
+    // Add this job to the read queue
+    this.batch.read.push(job.id);
+
+    // We should *not* schedule a new frame if:
+    // 1. We're 'reading'
+    // 2. A frame is already scheduled
+    var doesntNeedFrame = this.batch.mode === 'reading'
+      || this.batch.scheduled;
+
+    // If a frame isn't needed, return
+    if (doesntNeedFrame) return id;
+
+    // Schedule a new
+    // frame, then return
+    this.scheduleBatch();
+    return id;
+  };
+
+  /**
+   * Adds a job to the
+   * write batch and schedules
+   * a new frame if need be.
+   *
+   * @param  {Function} fn
+   * @public
+   */
+  FastDom.prototype.write = function(fn, ctx) {
+    var job = this.add('write', fn, ctx);
+    var mode = this.batch.mode;
+    var id = job.id;
+
+    // Push the job id into the queue
+    this.batch.write.push(job.id);
+
+    // We should *not* schedule a new frame if:
+    // 1. We are 'writing'
+    // 2. We are 'reading'
+    // 3. A frame is already scheduled.
+    var doesntNeedFrame = mode === 'writing'
+      || mode === 'reading'
+      || this.batch.scheduled;
+
+    // If a frame isn't needed, return
+    if (doesntNeedFrame) return id;
+
+    // Schedule a new
+    // frame, then return
+    this.scheduleBatch();
+    return id;
+  };
+
+  /**
+   * Defers the given job
+   * by the number of frames
+   * specified.
+   *
+   * If no frames are given
+   * then the job is run in
+   * the next free frame.
+   *
+   * @param  {Number}   frame
+   * @param  {Function} fn
+   * @public
+   */
+  FastDom.prototype.defer = function(frame, fn, ctx) {
+
+    // Accepts two arguments
+    if (typeof frame === 'function') {
+      ctx = fn;
+      fn = frame;
+      frame = 1;
+    }
+
+    var self = this;
+    var index = frame - 1;
+
+    return this.schedule(index, function() {
+      self.run({
+        fn: fn,
+        ctx: ctx
+      });
+    });
+  };
+
+  /**
+   * Clears a scheduled 'read',
+   * 'write' or 'defer' job.
+   *
+   * @param  {Number|String} id
+   * @public
+   */
+  FastDom.prototype.clear = function(id) {
+
+    // Defer jobs are cleared differently
+    if (typeof id === 'function') {
+      return this.clearFrame(id);
+    }
+
+    // Allow ids to be passed as strings
+    id = Number(id);
+
+    var job = this.batch.hash[id];
+    if (!job) return;
+
+    var list = this.batch[job.type];
+    var index = list.indexOf(id);
+
+    // Clear references
+    delete this.batch.hash[id];
+    if (~index) list.splice(index, 1);
+  };
+
+  /**
+   * Clears a scheduled frame.
+   *
+   * @param  {Function} frame
+   * @private
+   */
+  FastDom.prototype.clearFrame = function(frame) {
+    var index = this.frames.indexOf(frame);
+    if (~index) this.frames.splice(index, 1);
+  };
+
+  /**
+   * Schedules a new read/write
+   * batch if one isn't pending.
+   *
+   * @private
+   */
+  FastDom.prototype.scheduleBatch = function() {
+    var self = this;
+
+    // Schedule batch for next frame
+    this.schedule(0, function() {
+      self.batch.scheduled = false;
+      self.runBatch();
+    });
+
+    // Set flag to indicate
+    // a frame has been scheduled
+    this.batch.scheduled = true;
+  };
+
+  /**
+   * Generates a unique
+   * id for a job.
+   *
+   * @return {Number}
+   * @private
+   */
+  FastDom.prototype.uniqueId = function() {
+    return ++this.lastId;
+  };
+
+  /**
+   * Calls each job in
+   * the list passed.
+   *
+   * If a context has been
+   * stored on the function
+   * then it is used, else the
+   * current `this` is used.
+   *
+   * @param  {Array} list
+   * @private
+   */
+  FastDom.prototype.flush = function(list) {
+    var id;
+
+    while (id = list.shift()) {
+      this.run(this.batch.hash[id]);
+    }
+  };
+
+  /**
+   * Runs any 'read' jobs followed
+   * by any 'write' jobs.
+   *
+   * We run this inside a try catch
+   * so that if any jobs error, we
+   * are able to recover and continue
+   * to flush the batch until it's empty.
+   *
+   * @private
+   */
+  FastDom.prototype.runBatch = function() {
+    try {
+
+      // Set the mode to 'reading',
+      // then empty all read jobs
+      this.batch.mode = 'reading';
+      this.flush(this.batch.read);
+
+      // Set the mode to 'writing'
+      // then empty all write jobs
+      this.batch.mode = 'writing';
+      this.flush(this.batch.write);
+
+      this.batch.mode = null;
+
+    } catch (e) {
+      this.runBatch();
+      throw e;
+    }
+  };
+
+  /**
+   * Adds a new job to
+   * the given batch.
+   *
+   * @param {Array}   list
+   * @param {Function} fn
+   * @param {Object}   ctx
+   * @returns {Number} id
+   * @private
+   */
+  FastDom.prototype.add = function(type, fn, ctx) {
+    var id = this.uniqueId();
+    return this.batch.hash[id] = {
+      id: id,
+      fn: fn,
+      ctx: ctx,
+      type: type
+    };
+  };
+
+  /**
+   * Runs a given job.
+   *
+   * Applications using FastDom
+   * have the options of setting
+   * `fastdom.onError`.
+   *
+   * This will catch any
+   * errors that may throw
+   * inside callbacks, which
+   * is useful as often DOM
+   * nodes have been removed
+   * since a job was scheduled.
+   *
+   * Example:
+   *
+   *   fastdom.onError = function(e) {
+   *     // Runs when jobs error
+   *   };
+   *
+   * @param  {Object} job
+   * @private
+   */
+  FastDom.prototype.run = function(job){
+    var ctx = job.ctx || this;
+    var fn = job.fn;
+
+    // Clear reference to the job
+    delete this.batch.hash[job.id];
+
+    // If no `onError` handler
+    // has been registered, just
+    // run the job normally.
+    if (!this.onError) {
+      return fn.call(ctx);
+    }
+
+    // If an `onError` handler
+    // has been registered, catch
+    // errors that throw inside
+    // callbacks, and run the
+    // handler instead.
+    try { fn.call(ctx); } catch (e) {
+      this.onError(e);
+    }
+  };
+
+  /**
+   * Starts a rAF loop
+   * to empty the frame queue.
+   *
+   * @private
+   */
+  FastDom.prototype.loop = function() {
+    var self = this;
+    var raf = this.raf;
+
+    // Don't start more than one loop
+    if (this.looping) return;
+
+    raf(function frame() {
+      var fn = self.frames.shift();
+
+      // If no more frames,
+      // stop looping
+      if (!self.frames.length) {
+        self.looping = false;
+
+      // Otherwise, schedule the
+      // next frame
+      } else {
+        raf(frame);
+      }
+
+      // Run the frame.  Note that
+      // this may throw an error
+      // in user code, but all
+      // fastdom tasks are dealt
+      // with already so the code
+      // will continue to iterate
+      if (fn) fn();
+    });
+
+    this.looping = true;
+  };
+
+  /**
+   * Adds a function to
+   * a specified index
+   * of the frame queue.
+   *
+   * @param  {Number}   index
+   * @param  {Function} fn
+   * @return {Function}
+   * @private
+   */
+  FastDom.prototype.schedule = function(index, fn) {
+
+    // Make sure this slot
+    // hasn't already been
+    // taken. If it has, try
+    // re-scheduling for the next slot
+    if (this.frames[index]) {
+      return this.schedule(index + 1, fn);
+    }
+
+    // Start the rAF
+    // loop to empty
+    // the frame queue
+    this.loop();
+
+    // Insert this function into
+    // the frames queue and return
+    return this.frames[index] = fn;
+  };
+
+  // We only ever want there to be
+  // one instance of FastDom in an app
+  fastdom = fastdom || new FastDom();
+
+  /**
+   * Expose 'fastdom'
+   */
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = fastdom;
+  } else if (typeof define === 'function' && define.amd) {
+    define(function(){ return fastdom; });
+  } else {
+    window['fastdom'] = fastdom;
+  }
+
+})(window.fastdom);
+
+},{}],3:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -63,7 +572,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 (function (global){
 /**
  * @license
@@ -12419,85 +12928,83 @@ if (typeof Object.create === 'function') {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 'use strict';
 
 var _ = require('lodash');
 var inherits = require('inherits');
-var parser = new DOMParser();
+var fastdom = require('fastdom');
+
+var t = document.createElement('template');
+var templateSupport = 'content' in t;
+
+// utils
+function strToFrag(strHTML){
+    if( templateSupport ){
+        var temp=document.createElement('template');
+        temp.innerHTML=strHTML;
+        return temp.content;
+    }
+
+    var parser = new DOMParser(),
+    doc = parser.parseFromString(strHTML, "text/xml"),
+    documentFragment = document.createDocumentFragment() ;
+    documentFragment.appendChild( doc.documentElement );
+    return documentFragment;
+}
 
 function View(options) {
     options = options || {};
-
+    
     this.regions = [];
     this.root = null;
-    this.container = null;
     this.count = 1;
+    this.id = options.id || 'test';
 
-    this.force = true;
-
-    if (_.has(options, 'force') && options.force === false) {
-        this.force = false;
-    }
-
+    this.compiled = _.template(this.template);
     this.render();
 }
 
 module.exports = View;
 
-View.prototype.template = '<div id="region">REGION</div><div><%=test1%></div><div><%=count %></div>';
-
-View.prototype.data = function() {
-    this.count += 1;
-    return {
-        test1: 'guga',
-        count: this.count
-    };
-}
+View.prototype.data = function(){};
 
 View.prototype.render = function() {
+    //console.time('render')
     var el = document.createElement('div');
-    this.compiled = _.template(this.template);
-    el.innerHTML = this.compiled(this.data());
+    el.id = this.id;
+    el.className = 'box-view';
+    el.appendChild(strToFrag(this.compiled(this.data())))
     this.root = el;
-
-    _.each(this.regions, function(region) {
-        region.instance.attach(this.root.querySelector(region.selector));
-    }, this);
+    //console.timeEnd('render')
 }
 
 View.prototype.refresh = function() {
-    var doc = parser.parseFromString(this.compiled(this.data()), 'text/html');
+    //console.time('refresh')
+    /*var frag = strToFrag(this.compiled(this.data()));
+
+    this.regions.forEach(function(region) {
+        var node = frag.querySelector(region.selector);
+        var children = node.childNodes;
+        if (children.length === 0) {
+            node.innerHTML = '';
+        }
+        region.instance.attach(node);
+    }.bind(this));
+
     this.root.innerHTML = '';
-
-    _.each(this.regions, function(region) {
-         region.instance.attach(doc.body.querySelector(region.selector));
-     }, this);
-
-    while (doc.body.firstChild) {
-        this.root.appendChild(doc.body.firstChild)
-    };
+    this.root.appendChild(frag);*/
+    //console.timeEnd('refresh');
+    this.root.innerHTML = this.compiled(this.data());
 }
 
 View.prototype.attach = function(container) {
-    // if (this.container) {
-    // console.error('already attached to container: check below');
-    // console.info(this.container)
-    // } else {
-    //
-    this.container = container;
-    if (this.force) {
-        container.innerHTML = '';
-    }
-
     container.appendChild(this.root);
-
-    // }
 }
 
 View.prototype.remove = function() {
-    if (this.container) {
-        this.container.removeChild(this.root);
+    if (this.root.parentNode) {
+        this.root.parentNode.removeChild(this.root);
     } else {
         console.warn('Why are you removing if you didnt attach ?? ');
     }
@@ -12506,28 +13013,32 @@ View.prototype.remove = function() {
 View.prototype.destroy = function() {
     this.remove();
     this.root = null;
-    this.container = null;
-    console.log('DESTROY');
 }
 
 View.prototype.region = function(view, selector) {
     var node = this.root.querySelector(selector);
-    var force = view.force;
+    var children = node.childNodes;
+
     if (node) {
-        var region = _.find(this.regions, {selector: selector});
-        if (region && force) {
+        var region = _.find(this.regions, {node: node});
+        if (region) {
             var index = this.regions.indexOf(region);
             region.instance.destroy();
             if (index > -1) {
                 this.regions[index] = {
                     selector: selector,
-                    instance: view
+                    instance: view,
+                    node: node
                 };
             }
         } else {
+            if (children.length === 0) {
+                node.innerHTML = '';
+            }
             this.regions.push({
                 selector: selector,
-                instance: view
+                instance: view,
+                node: node
             });
         }
 
@@ -12537,7 +13048,7 @@ View.prototype.region = function(view, selector) {
     }
 }
 
-},{"inherits":2,"lodash":3}]},{},[1])
+},{"fastdom":2,"inherits":3,"lodash":4}]},{},[1])
 
 
 //# sourceMappingURL=script.js.map
