@@ -16,6 +16,8 @@
     "gulp-notify": "^2.2.0",
     "gulp-sourcemaps": "^1.5.2",
     "gulp-util": "^3.0.6",
+    "idom-template": "^0.1.0",
+    "incremental-dom": "^0.1.0",
     "inherits": "^2.0.1",
     "jstify": "^0.11.0",
     "lodash": "^3.10.0",

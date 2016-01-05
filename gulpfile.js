@@ -95,17 +95,7 @@ gulp.task('default', ['setWatch', 'js'], function() {
     bsync({
         server: {
             baseDir:    '.',
-            middleware: [
-                function(req, res, next) {
-                    var ext = path.extname(req.url);
-                    if ((ext === '' || ext === '.html') && req.url !== '/') {
-                        req.pipe(request('http://' + req.headers.host)).pipe(res);
-                    } else {
-                        next();
-                    }
-                }
 
-            ]
         },
         port:   3000,
         open:   false,

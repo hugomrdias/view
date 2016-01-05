@@ -1,553 +1,2136 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 'use strict';
 
-var _  = require('lodash');
+var _ = require('lodash');
 var inherits = require('inherits');
 var View = require('./view.js');
+var IDomView = require('./view-idom.js');
+var Views = require('./demo/main-view.js');
 
 /*
- *	Observe
+ *  Observe
  */
- var observer = new MutationObserver(function(mutations) {
-	// For the sake of...observation...let's output the mutation to console to see how this all works
-	mutations.forEach(function(mutation) {
-		var removed = mutation.removedNodes;
-		var added = mutation.addedNodes;
+var observer = new MutationObserver(function (mutations) {
+    // For the sake of...observation...let's output the mutation to console to see how this all works
+    mutations.forEach(function (mutation) {
+        var removed = mutation.removedNodes;
+        var added = mutation.addedNodes;
 
-		if(removed.length > 0 ){
-			console.log('Remove : ', mutation.target, removed.length, removed)
-		}
+        if (removed.length > 0) {
+            console.log('Remove : ', mutation.target, removed.length, removed)
+        }
 
-		if(added.length > 0 ){
-			console.log('Add : ' , mutation.target, added.length, added)
-		}
-		//console.log(mutation);
-	});    
+        if (added.length > 0) {
+            console.log('Add : ', mutation.target, added.length, added)
+        }
+
+        //console.log(mutation);
+    });
 });
- 
+
 // Notify me of everything!
 var observerConfig = {
-	attributes: false, 
-	childList: true, 
-	characterData: false,
-	subtree: true 
+    attributes   : false,
+    childList    : true,
+    characterData: false,
+    subtree      : true
 };
- 
+
 // Node, config
 // In this case we'll listen to all changes to body and child nodes
 var targetNode = document.getElementById('app');
+
 //observer.observe(targetNode, observerConfig);
 
-// Sub view 1
-function Content() {
+// // SETUP
+// var boxes;
+// var container = document.getElementById('app');
+// var legend = document.getElementById('timing');
+// var init = function() {
+//     boxes = _.map(_.range(1), function(i) {
+//         var box = new IDomView();
+//         box.attach(container);
+//         return box;
+//     });
+// };
+
+// var animate = function() {
+//     for (var i = 0, l = boxes.length; i < l; i++) {
+//         boxes[i].render();
+//     }
+// };
+
+// window.timeout = null;
+// window.totalTime = null;
+// window.loopCount = null;
+// var update = function() {
+//     var startDate = new Date();
+//     animate()
+//     var endDate = new Date();
+//     totalTime += endDate - startDate;
+//     loopCount++;
+//     if (loopCount % 20 === 0) {
+//         legend.textContent = 'Performed ' + loopCount + ' iterations in ' + totalTime + ' ms (average ' + (totalTime / loopCount).toFixed(2) + ' ms per loop).';
+//     }
+
+//     window.requestAnimationFrame(update);
+// };
+
+// init();
+// window.requestAnimationFrame(update);
+
+//var view = new Views.Main();
+//var content = new Views.Content();
+//var content2 = new Views.Content2();
+
+//view.view(content, '.region');
+//view.region(content2, '.region');
+//view.attach(document.getElementById('app'));
+// view.region(content, '#region');
+// view.region(content2, '.region');
+//view.render(true)
+//view.render(true)
+//view.render(true)
+//console.log(view.regions)
+//
+
+var db = require('./demo/dbmonster/db.js');
+var view = new db();
+//view.attach(document.getElementById('app'))
+
+function update() {
+    view.render()
+    window.requestAnimationFrame(update);
+    //setTimeout(function () {
+    //   update()
+    //},0)
+}
+//update();
+
+var tpl = require('idom-template');
+var idom = require('incremental-dom');
+
+tpl.registerHelper('my-console', function (attrs) {
+    console.log(attrs);
+});
+var render = tpl.compile(document.getElementById('i-template').innerHTML, idom);
+console.log(render);
+var data = {
+    content: 'guga'
+};
+
+
+idom.patch(document.getElementById('app'), function () {
+    render(data)
+});
+// setTimeout(function() {
+//     //content2.render();
+//     //view.render();
+// }, 2000)
+
+// setTimeout(function() {
+// }, 2000)
+
+},{"./demo/dbmonster/db.js":3,"./demo/main-view.js":5,"./view-idom.js":20,"./view.js":21,"idom-template":7,"incremental-dom":8,"inherits":18,"lodash":19}],2:[function(require,module,exports){
+// copy of junkola-copied-from-ember.js minus the underscore dependency
+// and turned into a module
+
+module.exports = function getDatabases(rows) {
+    var newData = getData(rows);
+    var databaseArray = [];
+
+    Object.keys(newData.databases).forEach(function (dbname) {
+        var sampleInfo = newData.databases[dbname];
+
+        if (!model.databases[dbname]) {
+            model.databases[dbname] = {
+                name   : dbname,
+                samples: []
+            };
+        }
+
+        var samples = model.databases[dbname].samples;
+        samples.push({
+            time   : newData.start_at,
+            queries: sampleInfo.queries
+        });
+        if (samples.length > 5) {
+            samples.splice(0, samples.length - 5);
+        }
+
+        databaseArray.push(model.databases[dbname]);
+    });
+
+    databaseArray.forEach(function (db) {
+
+        db.queries = db.samples[db.samples.length - 1].queries;
+        db.countClassName = countClassName(db.queries);
+        db.topFiveQueries = db.queries.slice(0, 5);
+        while (db.topFiveQueries.length < 5) {
+            db.topFiveQueries.push({query: ""});
+        }
+        db.topFiveQueries = db.topFiveQueries.map(function (query, index) {
+            return {
+                key      : index + '',
+                query    : query.query,
+                elapsed  : query.elapsed ? formatElapsed(query.elapsed) : '',
+                className: elapsedClass(query.elapsed)
+            };
+        });
+    });
+
+    return databaseArray;
+
+}
+
+function getData(rows) {
+    // generate some dummy data
+    var data = {
+        start_at : new Date().getTime() / 1000,
+        databases: {}
+    };
+
+    for (var i = 1; i <= rows; i++) {
+        data.databases["cluster" + i] = {
+            queries: []
+        };
+
+        data.databases["cluster" + i + "slave"] = {
+            queries: []
+        };
+    }
+
+    Object.keys(data.databases).forEach(function (dbname) {
+        var info = data.databases[dbname];
+
+        var r = Math.floor((Math.random() * 10) + 1);
+        for (var i = 0; i < r; i++) {
+            var q = {
+                canvas_action    : null,
+                canvas_context_id: null,
+                canvas_controller: null,
+                canvas_hostname  : null,
+                canvas_job_tag   : null,
+                canvas_pid       : null,
+                elapsed          : Math.random() * 15,
+                query            : "SELECT blah FROM something",
+                waiting          : Math.random() < 0.5
+            };
+
+            if (Math.random() < 0.2) {
+                q.query = "<IDLE> in transaction";
+            }
+
+            if (Math.random() < 0.1) {
+                q.query = "vacuum";
+            }
+
+            info.queries.push(q);
+        }
+
+        info.queries = info.queries.sort(function (a, b) {
+            return b.elapsed - a.elapsed;
+        });
+    });
+
+    return data;
+}
+
+var model = {
+    databases: {}
+};
+
+var _base;
+
+(_base = String.prototype).lpad || (_base.lpad = function (padding, toLength) {
+    return padding.repeat((toLength - this.length) / padding.length).concat(this);
+});
+
+function countClassName(queries) {
+    var countClassName = "label";
+
+    if (queries.length >= 20) {
+        countClassName += " label-important";
+    } else if (queries.length >= 10) {
+        countClassName += " label-warning";
+    } else {
+        countClassName += " label-success";
+    }
+
+    return countClassName;
+}
+
+function elapsedClass(elapsed) {
+    if (elapsed >= 10.0) {
+        return "elapsed warn_long";
+    } else if (elapsed >= 1.0) {
+        return "elapsed warn";
+    } else {
+        return "elapsed short";
+    }
+}
+
+function formatElapsed(value) {
+    var str = parseFloat(value).toFixed(2);
+    if (value > 60) {
+        var minutes = Math.floor(value / 60);
+        var comps = (value % 60).toFixed(2).split('.');
+        var seconds = comps[0].lpad('0', 2);
+        var ms = comps[1];
+        str = minutes + ":" + seconds + "." + ms;
+    }
+    return str;
+}
+
+},{}],3:[function(require,module,exports){
+'use strict';
+
+var inherits = require('inherits');
+var _ = require('lodash');
+var View = require('./../../view');
+var data = require('./data.js')
+
+function Main(options) {
     View.apply(this, arguments);
 }
 
+inherits(Main, View);
+module.exports = Main;
+
+Main.prototype.template = require('./db.tpl');
+
+Main.prototype.data = function () {
+    return {
+        dbs: data(100)
+    };
+}
+
+},{"./../../view":21,"./data.js":2,"./db.tpl":4,"inherits":18,"lodash":19}],4:[function(require,module,exports){
+var _ = require('lodash');
+module.exports = function(data){
+var __t,__p='',__j=Array.prototype.join,print=function(){__p+=__j.call(arguments,'');};
+__p+='<table class="table table-striped latest-data"> <tbody> ';
+ _.each(data.dbs, function(db) { 
+__p+=' <tr> <td class="dbname"> '+
+((__t=( db.name ))==null?'':__t)+
+' </td> <td class="query-count"> <span class="'+
+((__t=( db.countClassName ))==null?'':__t)+
+'"> '+
+((__t=( db.queries.length ))==null?'':__t)+
+' </span> </td> ';
+ _.each(db.topFiveQueries, function(query) { 
+__p+=' <td class="Query '+
+((__t=( query.className ))==null?'':__t)+
+'"> '+
+((__t=( query.elapsed ))==null?'':__t)+
+' <div class="popover left"> <div class="popover-content">'+
+((__t=( query.query ))==null?'':__t)+
+'</div> <div class="arrow"></div> </div> </td> ';
+ });
+__p+=' </tr> ';
+ });
+__p+=' </tbody> </table>';
+return __p;
+};
+
+},{"lodash":19}],5:[function(require,module,exports){
+'use strict';
+
+var inherits = require('inherits');
+var _ = require('lodash');
+var View = require('./../view.js');
+
+function Main(options) {
+    View.apply(this, arguments);
+    this.cid = 'main';
+    this.tagName = 'span';
+    this.attributes = {
+        id   : 'main',
+        class: 'main'
+    }
+
+    //this.events = {
+    //    //'click .main'        : 'handleRegion',
+    //    'click .region': function (e) {
+    //        console.log(this.template, e);
+    //    }
+    //}
+}
+
+inherits(Main, View);
+exports.Main = Main;
+
+Main.prototype.template = _.template('<div><%= name %></div><div id="region" class="region"></div>');
+
+Main.prototype.data = function () {
+    return {
+        name: 'guga'
+    }
+}
+
+Main.prototype.addViews = function (add) {
+    //var view = new Content();
+    _.each(_.range(100), function (index) {
+
+        add(new Content({
+            data: {n: index}
+        }), '.region');
+    });
+}
+
+Main.prototype.events = function () {
+    return {
+        //'click .main'        : 'handleRegion',
+        'click .region': function (e) {
+            console.log(this.template, e);
+        }
+    }
+}
+
+//Main.prototype.beforeRender = function (frag) {
+//    console.log('before', this.cid, frag.querySelector('.region').getBoundingClientRect());
+//}
+//
+//Main.prototype.afterRender = function () {
+//    console.log('after', this.cid, this.root.querySelector('.region').getBoundingClientRect());
+//}
+
+// subview 1
+function Content(options) {
+    View.apply(this, arguments);
+    this.data = options.data;
+    this.cid = 'content';
+}
+
 inherits(Content, View);
-Content.prototype.template = '<div>Content</div>';
-//var content = new Content({id: 'content'});
+exports.Content = Content;
+Content.prototype.template = _.template('<div><%=n %></div>');
+//Content.prototype.beforeRender = function (frag) {
+//    console.log('before', this.cid, frag.firstChild.getBoundingClientRect());
+//}
+//
+//Content.prototype.afterRender = function () {
+//    console.log('after', this.cid, this.root.firstChild.getBoundingClientRect());
+//
+//    var nested = this.root.firstChild.getBoundingClientRect().width;
+//    var parent = this.root.parentNode.getBoundingClientRect().width;
+//    if(nested !== parent){
+//        console.error('ERRROOOOOOOrr')
+//    }
+//}
 
 // subview 2
 function Content2() {
+    this.count = 0;
+    this.events = {
+        'click #click': 'handle'
+    }
+    this.tagName = 'span';
+    this.attributes = {
+        id   : 'Content2',
+        class: 'Content2'
+    }
     View.apply(this, arguments);
 }
 
 inherits(Content2, View);
-Content2.prototype.template = '<div>Content2</div>';
-//var content2 = new Content2({id: 'content2'});
+exports.Content2 = Content2;
 
-// Main View 
-function Main(options){
-	View.apply(this, arguments);
-	this.count = 0;
-	this.number = options.number;
+Content2.prototype.template = _.template('<div id="click"><%= name %></div>');
+
+Content2.prototype.data = function () {
+    this.count += 1;
+    return {
+        name: this.count
+    }
 }
-inherits(Main, View);
-Main.prototype.data = function() {
-	var count = this.count += 1;
-	return {
-            top: Math.sin(count / 10) * 10,
-            left: Math.cos(count / 10) * 10,
-            color: (count) % 255,
-            content: count % 100,
-            number : this.number
+
+Content2.prototype.handle = function (e) {
+    console.log(this.template, e);
+}
+
+},{"./../view.js":21,"inherits":18,"lodash":19}],6:[function(require,module,exports){
+// shim for using process in browser
+
+var process = module.exports = {};
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = setTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            currentQueue[queueIndex].run();
         }
-};
-Main.prototype.template = document.getElementById('template').textContent;
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    clearTimeout(timeout);
+}
 
-// SETUP
-var boxes;
-var container = document.getElementById('app');
-var legend = document.getElementById('timing');
-var init = function() {
-    boxes = _.map(_.range(100), function(i) {
-        var box = new Main({number: i});
-        box.attach(container);
-        return box;
-    });
-};
-
-
-var animate = function() {
-    for (var i = 0, l = boxes.length; i < l; i++) {
-      boxes[i].refresh();
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        setTimeout(drainQueue, 0);
     }
 };
 
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
 
-window.timeout = null;
-window.totalTime = null;
-window.loopCount = null;
-var update = function() {
-    var startDate = new Date();
-    for (var i = 0, l = boxes.length; i < l; i++) {
-       boxes[i].refresh();
-    }
-    var endDate = new Date();
-    totalTime += endDate - startDate;
-    loopCount++;
-    if (loopCount % 20 === 0) {
-        legend.textContent = 'Performed ' + loopCount + ' iterations in ' + totalTime + ' ms (average ' + (totalTime / loopCount).toFixed(2) + ' ms per loop).';
-    }
-    window.requestAnimationFrame(update);
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
 };
 
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
 
-init();
-window.requestAnimationFrame(update);
-
-//var view = new Main({number: 0});
-
-//view.region(content2, '#region');
-//view.attach(document.getElementById('app'));
-//view.region(content, '#region');
-
-/*setTimeout(function() {
-    view.refresh();
-}, 1000)*/
-
-//var region = document.getElementById('region');
-
-//region.removeChild(region.firstChild);
-},{"./view.js":5,"inherits":3,"lodash":4}],2:[function(require,module,exports){
-/**
- * FastDom
- *
- * Eliminates layout thrashing
- * by batching DOM read/write
- * interactions.
- *
- * @author Wilson Page <wilsonpage@me.com>
+},{}],7:[function(require,module,exports){
+;(function(root, factory) {
+  if (typeof define === 'function' && define.amd) {
+    define([], factory);
+  } else if (typeof exports === 'object') {
+    module.exports = factory();
+  } else {
+    root.itemplate = factory();
+  }
+}(this, function() {
+/*
+ * Original code by HTML Parser By John Resig (ejohn.org)
+ * http://ejohn.org/blog/pure-javascript-html-parser/
  */
 
-;(function(fastdom){
+// Regular Expressions for parsing tags and attributes
+var startTag = /^<([-A-Za-z0-9_]+)((?:[\s\w\-]+(?:\s*=\s*(?:(?:"[^"]*")|(?:'[^']*')|[^>\s]+))?)*)\s*(\/?)>/,
+    endTag = /^<\/([-A-Za-z0-9_]+)[^>]*>/,
+    attr = /([-A-Za-z0-9_]+)(?:\s*=\s*(?:(?:"((?:\\.|[^"])*)")|(?:'((?:\\.|[^'])*)')|([^>\s]+)))?/g;
 
-  'use strict';
+// Empty Elements - HTML 4.01
+var empty = makeMap("area,base,basefont,br,col,frame,hr,img,input,isindex,link,meta,param,embed");
 
-  // Normalize rAF
-  var raf = window.requestAnimationFrame
-    || window.webkitRequestAnimationFrame
-    || window.mozRequestAnimationFrame
-    || window.msRequestAnimationFrame
-    || function(cb) { return window.setTimeout(cb, 1000 / 60); };
+// Block Elements - HTML 4.01
+var block = makeMap("address,applet,blockquote,button,center,dd,del,dir,div,dl,dt,fieldset,form,frameset,hr,iframe,ins,isindex,li,map,menu,noframes,noscript,object,ol,p,pre,script,table,tbody,td,tfoot,th,thead,tr,ul");
 
-  /**
-   * Creates a fresh
-   * FastDom instance.
-   *
-   * @constructor
-   */
-  function FastDom() {
-    this.frames = [];
-    this.lastId = 0;
+// Inline Elements - HTML 4.01
+var inline = makeMap("a,abbr,acronym,applet,b,basefont,bdo,big,br,button,cite,code,del,dfn,em,font,i,iframe,img,input,ins,kbd,label,map,object,q,s,samp,script,select,small,span,strike,strong,sub,sup,textarea,tt,u,var");
 
-    // Placing the rAF method
-    // on the instance allows
-    // us to replace it with
-    // a stub for testing.
-    this.raf = raf;
+// Elements that you can, intentionally, leave open
+// (and which close themselves)
+var closeSelf = makeMap("colgroup,dd,dt,li,options,p,td,tfoot,th,thead,tr");
 
-    this.batch = {
-      hash: {},
-      read: [],
-      write: [],
-      mode: null
+// Attributes that have their values filled in disabled="disabled"
+var fillAttrs = makeMap("checked,compact,declare,defer,disabled,ismap,multiple,nohref,noresize,noshade,nowrap,readonly,selected");
+
+// Special Elements (can contain anything),
+var special = makeMap("");//"script", "style"
+
+function makeMap(str) {
+    var obj = {}, items = str.split(",");
+    for (var i = 0; i < items.length; i++)
+        obj[items[i]] = true;
+    return obj;
+}
+
+var HTMLParser = function (html, handler) {
+    var index, chars, match, stack = [], last = html;
+    stack.last = function () {
+        return this[this.length - 1];
     };
-  }
 
-  /**
-   * Adds a job to the
-   * read batch and schedules
-   * a new frame if need be.
-   *
-   * @param  {Function} fn
-   * @public
-   */
-  FastDom.prototype.read = function(fn, ctx) {
-    var job = this.add('read', fn, ctx);
-    var id = job.id;
+    while (html) {
+        chars = true;
 
-    // Add this job to the read queue
-    this.batch.read.push(job.id);
+        if (!stack.last() || !special[stack.last()]) {
 
-    // We should *not* schedule a new frame if:
-    // 1. We're 'reading'
-    // 2. A frame is already scheduled
-    var doesntNeedFrame = this.batch.mode === 'reading'
-      || this.batch.scheduled;
+            // Comment
+            if (html.indexOf("<!--") == 0) {
+                index = html.indexOf("-->");
 
-    // If a frame isn't needed, return
-    if (doesntNeedFrame) return id;
+                if (index >= 0) {
+                    if (handler.comment)
+                        handler.comment(html.substring(4, index));
+                    html = html.substring(index + 3);
+                    chars = false;
+                }
 
-    // Schedule a new
-    // frame, then return
-    this.scheduleBatch();
-    return id;
-  };
+                // end tag
+            } else if (html.indexOf("</") == 0) {
+                match = html.match(endTag);
 
-  /**
-   * Adds a job to the
-   * write batch and schedules
-   * a new frame if need be.
-   *
-   * @param  {Function} fn
-   * @public
-   */
-  FastDom.prototype.write = function(fn, ctx) {
-    var job = this.add('write', fn, ctx);
-    var mode = this.batch.mode;
-    var id = job.id;
+                if (match) {
+                    html = html.substring(match[0].length);
+                    match[0].replace(endTag, parseEndTag);
+                    chars = false;
+                }
 
-    // Push the job id into the queue
-    this.batch.write.push(job.id);
+                // start tag
+            } else if (html.indexOf("<") == 0) {
+                match = html.match(startTag);
+                if (match) {
+                    html = html.substring(match[0].length);
+                    match[0].replace(startTag, parseStartTag);
+                    chars = false;
+                }
+            }
 
-    // We should *not* schedule a new frame if:
-    // 1. We are 'writing'
-    // 2. We are 'reading'
-    // 3. A frame is already scheduled.
-    var doesntNeedFrame = mode === 'writing'
-      || mode === 'reading'
-      || this.batch.scheduled;
+            if (chars) {
+                index = html.indexOf("<");
 
-    // If a frame isn't needed, return
-    if (doesntNeedFrame) return id;
+                var text = index < 0 ? html : html.substring(0, index);
+                html = index < 0 ? "" : html.substring(index);
 
-    // Schedule a new
-    // frame, then return
-    this.scheduleBatch();
-    return id;
-  };
+                if (handler.chars)
+                    handler.chars(text);
+            }
 
-  /**
-   * Defers the given job
-   * by the number of frames
-   * specified.
-   *
-   * If no frames are given
-   * then the job is run in
-   * the next free frame.
-   *
-   * @param  {Number}   frame
-   * @param  {Function} fn
-   * @public
-   */
-  FastDom.prototype.defer = function(frame, fn, ctx) {
+        } else {
+            html = html.replace(new RegExp("(.*)<\/" + stack.last() + "[^>]*>"), function (all, text) {
+                text = text.replace(/<!--(.*?)-->/g, "$1")
+                    .replace(/<!\[CDATA\[(.*?)]]>/g, "$1");
 
-    // Accepts two arguments
-    if (typeof frame === 'function') {
-      ctx = fn;
-      fn = frame;
-      frame = 1;
+                if (handler.chars)
+                    handler.chars(text);
+
+                return "";
+            });
+
+            parseEndTag("", stack.last());
+        }
+
+        if (html == last)
+            throw "Parse Error: " + html;
+
+        last = html;
     }
 
-    var self = this;
-    var index = frame - 1;
+    // Clean up any remaining tags
+    parseEndTag();
 
-    return this.schedule(index, function() {
-      self.run({
-        fn: fn,
-        ctx: ctx
-      });
+    function parseStartTag(tag, tagName, rest, unary) {
+        tagName = tagName.toLowerCase();
+
+        if (block[tagName]) {
+            while (stack.last() && inline[stack.last()]) {
+                parseEndTag("", stack.last());
+            }
+        }
+
+        if (closeSelf[tagName] && stack.last() == tagName) {
+            parseEndTag("", tagName);
+        }
+
+        unary = empty[tagName] || !!unary;
+
+        if (!unary)
+            stack.push(tagName);
+
+        if (handler.start) {
+            var attrs = [];
+
+            rest.replace(attr, function (match, name) {
+                var value = arguments[2] ? arguments[2] :
+                    arguments[3] ? arguments[3] :
+                        arguments[4] ? arguments[4] :
+                            fillAttrs[name] ? name : "";
+
+                attrs.push({
+                    name: name,
+                    value: value,
+                    escaped: value.replace(/(^|[^\\])"/g, '$1\\\"')
+                });
+            });
+
+            if (handler.start)
+                handler.start(tagName, attrs, unary);
+        }
+    }
+
+    function parseEndTag(tag, tagName) {
+        var pos;
+
+        // If no tag name is provided, clean shop
+        if (!tagName)
+            pos = 0;
+
+        // Find the closest opened tag of the same type
+        else
+            for (pos = stack.length - 1; pos >= 0; pos--)
+                if (stack[pos] == tagName)
+                    break;
+
+        if (pos >= 0) {
+            // Close all the open elements, up the stack
+            for (var i = stack.length - 1; i >= pos; i--)
+                if (handler.end)
+                    handler.end(stack[i]);
+
+            // Remove the open elements from the stack
+            stack.length = pos;
+        }
+    }
+};
+// Consts
+const EXCEPTIONS = ["pre", "script"];
+const DUTY = ["evaluate"];
+const BREAK_LINE = /(\r\n|\n|\r)/gm;
+const NEW_LINE = "String.fromCharCode(10)";
+
+if (typeof special === 'object')
+    special[DUTY] = true;
+
+// variables
+var _helpers = {};
+var _result = [];
+var _staticArrays = {};
+var _currentTag = null;
+var _options = {
+    parameterName: "data",
+    template: {
+        evaluate: /<%([\s\S]+?)%>/g,
+        interpolate: /<%=([\s\S]+?)%>/g,
+        escape: /<%-([\s\S]+?)%>/g
+    },
+    escape: /[&<>]/g,
+    MAP: {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    },
+    accessory: {
+        open: "{%",
+        close: "%}"
+    },
+    staticKey: "static-key"
+};
+
+function makeKey() {
+    var text = "", possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+    for (var i = 0; i < 12; i++)
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+
+    return text;
+}
+
+function escapeHTML(s) {
+    return s.replace(_options.escape, function (c) {
+        return _options.MAP[c];
     });
-  };
+}
 
-  /**
-   * Clears a scheduled 'read',
-   * 'write' or 'defer' job.
-   *
-   * @param  {Number|String} id
-   * @public
-   */
-  FastDom.prototype.clear = function(id) {
+function flushParser() {
+    _result.length = 0;
+    _staticArrays = {};
+    _currentTag = null;
 
-    // Defer jobs are cleared differently
-    if (typeof id === 'function') {
-      return this.clearFrame(id);
-    }
+    _result.push('var o=lib.elementOpen,c=lib.elementClose,t=lib.text,v=lib.elementVoid;');
+}
 
-    // Allow ids to be passed as strings
-    id = Number(id);
+function decodeTemplates(string, openTag, closeTag) {
+    var regex = new RegExp(openTag + '(.*?)' + closeTag, 'g');
+    var prefix = true;
+    var suffix = true;
+    var isStatic = true;
 
-    var job = this.batch.hash[id];
-    if (!job) return;
+    var result = string.replace(regex, function (match, p1, index, string) {
+        isStatic = false;
 
-    var list = this.batch[job.type];
-    var index = list.indexOf(id);
+        if (index !== 0)
+            p1 = "\'+" + p1;
+        else
+            prefix = false;
 
-    // Clear references
-    delete this.batch.hash[id];
-    if (~index) list.splice(index, 1);
-  };
+        if ((string.length - (index + match.length)) > 0)
+            p1 += "+\'";
+        else
+            suffix = false;
 
-  /**
-   * Clears a scheduled frame.
-   *
-   * @param  {Function} frame
-   * @private
-   */
-  FastDom.prototype.clearFrame = function(frame) {
-    var index = this.frames.indexOf(frame);
-    if (~index) this.frames.splice(index, 1);
-  };
-
-  /**
-   * Schedules a new read/write
-   * batch if one isn't pending.
-   *
-   * @private
-   */
-  FastDom.prototype.scheduleBatch = function() {
-    var self = this;
-
-    // Schedule batch for next frame
-    this.schedule(0, function() {
-      self.batch.scheduled = false;
-      self.runBatch();
+        return p1;
     });
 
-    // Set flag to indicate
-    // a frame has been scheduled
-    this.batch.scheduled = true;
-  };
-
-  /**
-   * Generates a unique
-   * id for a job.
-   *
-   * @return {Number}
-   * @private
-   */
-  FastDom.prototype.uniqueId = function() {
-    return ++this.lastId;
-  };
-
-  /**
-   * Calls each job in
-   * the list passed.
-   *
-   * If a context has been
-   * stored on the function
-   * then it is used, else the
-   * current `this` is used.
-   *
-   * @param  {Array} list
-   * @private
-   */
-  FastDom.prototype.flush = function(list) {
-    var id;
-
-    while (id = list.shift()) {
-      this.run(this.batch.hash[id]);
-    }
-  };
-
-  /**
-   * Runs any 'read' jobs followed
-   * by any 'write' jobs.
-   *
-   * We run this inside a try catch
-   * so that if any jobs error, we
-   * are able to recover and continue
-   * to flush the batch until it's empty.
-   *
-   * @private
-   */
-  FastDom.prototype.runBatch = function() {
-    try {
-
-      // Set the mode to 'reading',
-      // then empty all read jobs
-      this.batch.mode = 'reading';
-      this.flush(this.batch.read);
-
-      // Set the mode to 'writing'
-      // then empty all write jobs
-      this.batch.mode = 'writing';
-      this.flush(this.batch.write);
-
-      this.batch.mode = null;
-
-    } catch (e) {
-      this.runBatch();
-      throw e;
-    }
-  };
-
-  /**
-   * Adds a new job to
-   * the given batch.
-   *
-   * @param {Array}   list
-   * @param {Function} fn
-   * @param {Object}   ctx
-   * @returns {Number} id
-   * @private
-   */
-  FastDom.prototype.add = function(type, fn, ctx) {
-    var id = this.uniqueId();
-    return this.batch.hash[id] = {
-      id: id,
-      fn: fn,
-      ctx: ctx,
-      type: type
+    return {
+        isStatic: isStatic,
+        value: (prefix ? '\'' : '') + result + (suffix ? '\'' : '')
     };
-  };
+}
 
-  /**
-   * Runs a given job.
-   *
-   * Applications using FastDom
-   * have the options of setting
-   * `fastdom.onError`.
-   *
-   * This will catch any
-   * errors that may throw
-   * inside callbacks, which
-   * is useful as often DOM
-   * nodes have been removed
-   * since a job was scheduled.
-   *
-   * Example:
-   *
-   *   fastdom.onError = function(e) {
-   *     // Runs when jobs error
-   *   };
-   *
-   * @param  {Object} job
-   * @private
-   */
-  FastDom.prototype.run = function(job){
-    var ctx = job.ctx || this;
-    var fn = job.fn;
+function encodeTemplates(string) {
+    return string
+        .replace(_options.template.interpolate, function (match, p1) {
+            return _options.accessory.open + p1 + _options.accessory.close;
+        })
+        .replace(_options.template.escape, function (match, p1) {
+            return _options.accessory.open + escapeHTML(p1) + _options.accessory.close;
+        })
+        .replace(_options.template.evaluate, function (match, p1) {
+            return "<evaluate>" + p1.replace(BREAK_LINE, " ").trim() + "</evaluate>";
+        });
+}
 
-    // Clear reference to the job
-    delete this.batch.hash[job.id];
+function writeCommand(command, line, noEscape) {
+    var attribs = "";
 
-    // If no `onError` handler
-    // has been registered, just
-    // run the job normally.
-    if (!this.onError) {
-      return fn.call(ctx);
+    if (line.length === 0) // don't write empty string or array
+        return;
+
+    if (typeof line === "string") {
+        if (noEscape)
+            attribs = line;
+        else
+            attribs = "'" + line.replace("'", "\\'") + "'"; // wrap attribute value
+
+    } else { // create formatted string from array
+        for (var i = 0; i < line.length; i++) {
+            if (i > 0) // add comma between parameters
+                attribs += ", ";
+
+            attribs += line[i];
+        }
     }
 
-    // If an `onError` handler
-    // has been registered, catch
-    // errors that throw inside
-    // callbacks, and run the
-    // handler instead.
-    try { fn.call(ctx); } catch (e) {
-      this.onError(e);
+    // wrap in command
+    _result.push(command + "(" + attribs + ");");
+}
+
+function writeLine(string, noEscape) {
+    _result.push(noEscape ? string : string.replace(BREAK_LINE, " "));
+}
+
+function attrsWrapp(array) {
+    for (var i = 0, obj = {}; i < array.length; i += 1) {
+        obj[array[i].name] = array[i].value;
     }
-  };
+    return obj;
+}
 
-  /**
-   * Starts a rAF loop
-   * to empty the frame queue.
-   *
-   * @private
-   */
-  FastDom.prototype.loop = function() {
-    var self = this;
-    var raf = this.raf;
+// parsing of string
+function onopentag(name, attributes, unary) {
+    var attribs = attrsWrapp(attributes);
+    var args = ["'" + name + "'"];
+    var staticAttrs = [], attr;
+    var staticKey = false;
 
-    // Don't start more than one loop
-    if (this.looping) return;
-
-    raf(function frame() {
-      var fn = self.frames.shift();
-
-      // If no more frames,
-      // stop looping
-      if (!self.frames.length) {
-        self.looping = false;
-
-      // Otherwise, schedule the
-      // next frame
-      } else {
-        raf(frame);
-      }
-
-      // Run the frame.  Note that
-      // this may throw an error
-      // in user code, but all
-      // fastdom tasks are dealt
-      // with already so the code
-      // will continue to iterate
-      if (fn) fn();
-    });
-
-    this.looping = true;
-  };
-
-  /**
-   * Adds a function to
-   * a specified index
-   * of the frame queue.
-   *
-   * @param  {Number}   index
-   * @param  {Function} fn
-   * @return {Function}
-   * @private
-   */
-  FastDom.prototype.schedule = function(index, fn) {
-
-    // Make sure this slot
-    // hasn't already been
-    // taken. If it has, try
-    // re-scheduling for the next slot
-    if (this.frames[index]) {
-      return this.schedule(index + 1, fn);
+    if (attribs.hasOwnProperty(_options.staticKey)) {
+        staticKey = attribs[_options.staticKey] || "'" + makeKey() + "'";
+        delete attribs[_options.staticKey];
     }
 
-    // Start the rAF
-    // loop to empty
-    // the frame queue
-    this.loop();
+    if (DUTY.indexOf(name) === -1) {
+        for (var key in attribs) {
+            if (!attribs.hasOwnProperty(key))
+                continue;
 
-    // Insert this function into
-    // the frames queue and return
-    return this.frames[index] = fn;
-  };
+            if (args.length == 1) {
+                args.push(null);
+                args.push(null);
+            }
 
-  // We only ever want there to be
-  // one instance of FastDom in an app
-  fastdom = fastdom || new FastDom();
+            attr = decodeTemplates(attribs[key], _options.accessory.open, _options.accessory.close);
+            if (staticKey && attr.isStatic) {
+                staticAttrs.push("'" + key + "'");
+                staticAttrs.push(attr.value);
+            } else {
+                args.push("'" + key + "'");
+                args.push(attr.value);
+            }
+        }
 
-  /**
-   * Expose 'fastdom'
-   */
+        if (staticKey) {
+            _staticArrays[staticKey] = "[" + staticAttrs.join(",") + "]";
 
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = fastdom;
-  } else if (typeof define === 'function' && define.amd) {
-    define(function(){ return fastdom; });
+            args[1] = "'" + makeKey() + "'";
+            args[2] = staticKey;
+        }
+
+        if (unary)
+            if (_helpers.hasOwnProperty(name))
+                writeLine("helpers['" + name + "'](" + decodeAttrs(attribs) + ");", true);
+            else
+                writeCommand("v", args);
+        else
+            writeCommand("o", args);
+    }
+
+    _currentTag = name;
+}
+
+function decodeAttrs(obj) {
+    var result = ["{"];
+    for (var key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            if (result.length > 1)
+                result.push(",");
+
+            result.push(key + ":" +decodeTemplates(obj[key], _options.accessory.open, _options.accessory.close).value);
+        }
+    }
+    result.push("}");
+
+    return result.join("");
+}
+
+function ontext(text) {
+    var line;
+    if (DUTY.indexOf(_currentTag) !== -1) {
+        writeLine(text);
+    } else if (EXCEPTIONS.indexOf(_currentTag) === -1) {
+        line = text.replace(BREAK_LINE, "").trim();
+        if (line.length > 0)
+            writeCommand("t", decodeTemplates(line, _options.accessory.open, _options.accessory.close).value, true);
+    } else { // save format (break lines) for exception tags
+        var lines = text.split(BREAK_LINE);
+        for (var i = 0; i < lines.length; i++) {
+            line = lines[i];
+
+            if (BREAK_LINE.exec(line))
+                writeCommand("t", NEW_LINE, true);
+            else
+                writeCommand("t", decodeTemplates(line, _options.accessory.open, _options.accessory.close).value, true);
+        }
+    }
+}
+
+function onclosetag(tagname) {
+    if (DUTY.indexOf(tagname) === -1)
+        writeCommand("c", tagname);
+}
+
+var itemplate = {
+    compile: function (string, library) {
+        flushParser();
+        HTMLParser(encodeTemplates(string), {
+            start: onopentag,
+            chars: ontext,
+            end: onclosetag
+        });
+
+        var fn = "";
+        for (var key in _staticArrays) {
+            if (_staticArrays.hasOwnProperty(key)) {
+                fn += "var " + key + "=" + _staticArrays[key] + ";";
+            }
+        }
+        fn += "return function(" + _options.parameterName + "){" + _result.join("") + "}";
+
+        return (new Function('lib', 'helpers', fn))(library, _helpers);
+    },
+    options: function (options) {
+        // mix options
+        for (var key in options) {
+            if (options.hasOwnProperty(key))
+                _options[key] = options[key];
+        }
+    },
+    registerHelper: function (name, fn) {
+        _helpers[name] = fn;
+    },
+    unregisterHelper: function (name) {
+        delete _helpers[name];
+    }
+};
+return itemplate;
+}));
+
+},{}],8:[function(require,module,exports){
+/**
+ * @license
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var patch = require('./src/patch').patch;
+var elements = require('./src/virtual_elements');
+
+module.exports = {
+  patch: patch,
+  elementVoid: elements.elementVoid,
+  elementOpenStart: elements.elementOpenStart,
+  elementOpenEnd: elements.elementOpenEnd,
+  elementOpen: elements.elementOpen,
+  elementClose: elements.elementClose,
+  text: elements.text,
+  attr: elements.attr
+};
+
+
+},{"./src/patch":13,"./src/virtual_elements":16}],9:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var nodes = require('./nodes'),
+    createNode = nodes.createNode,
+    getKey = nodes.getKey,
+    getNodeName = nodes.getNodeName,
+    getChild = nodes.getChild,
+    registerChild = nodes.registerChild;
+var markVisited = require('./traversal').markVisited;
+var getWalker = require('./walker').getWalker;
+
+
+/**
+ * Checks whether or not a given node matches the specified nodeName and key.
+ *
+ * @param {?Node} node An HTML node, typically an HTMLElement or Text.
+ * @param {?string} nodeName The nodeName for this node.
+ * @param {?string} key An optional key that identifies a node.
+ * @return {boolean} True if the node matches, false otherwise.
+ */
+var matches = function(node, nodeName, key) {
+  return node &&
+         key === getKey(node) &&
+         nodeName === getNodeName(node);
+};
+
+
+/**
+ * Aligns the virtual Element definition with the actual DOM, moving the
+ * corresponding DOM node to the correct location or creating it if necessary.
+ * @param {?string} nodeName For an Element, this should be a valid tag string.
+ *     For a Text, this should be #text.
+ * @param {?string} key The key used to identify this element.
+ * @param {?Array<*>|string} statics For an Element, this should be an array of
+ *     name-value pairs. For a Text, this should be the text content of the
+ *     node.
+ * @return {!Node} The matching node.
+ */
+var alignWithDOM = function(nodeName, key, statics) {
+  var walker = getWalker();
+  var currentNode = walker.currentNode;
+  var parent = walker.getCurrentParent();
+  var matchingNode;
+
+  // Check to see if we have a node to reuse
+  if (matches(currentNode, nodeName, key)) {
+    matchingNode = currentNode;
   } else {
-    window['fastdom'] = fastdom;
+    var existingNode = key && getChild(parent, key);
+
+    // Check to see if the node has moved within the parent or if a new one
+    // should be created
+    if (existingNode) {
+      matchingNode = existingNode;
+    } else {
+      matchingNode = createNode(walker.doc, nodeName, key, statics);
+      registerChild(parent, key, matchingNode);
+    }
+
+    parent.insertBefore(matchingNode, currentNode);
+    walker.currentNode = matchingNode;
   }
 
-})(window.fastdom);
+  markVisited(parent, matchingNode);
 
-},{}],3:[function(require,module,exports){
+  return matchingNode;
+};
+
+
+/** */
+module.exports = {
+  alignWithDOM: alignWithDOM
+};
+
+
+},{"./nodes":12,"./traversal":14,"./walker":17}],10:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var getData = require('./node_data').getData;
+
+
+/**
+ * Applies an attribute or property to a given Element. If the value is a object
+ * or a function (which includes null), it is set as a property on the Element.
+ * Otherwise, the value is set as an attribute.
+ * @param {!Element} el
+ * @param {string} name The attribute's name.
+ * @param {*} value The attribute's value. If the value is a string, it is set
+ *     as an HTML attribute, otherwise, it is set on node.
+ */
+var applyAttr = function(el, name, value) {
+  var data = getData(el);
+  var attrs = data.attrs;
+
+  if (attrs[name] === value) {
+    return;
+  }
+
+  var type = typeof value;
+
+  if (value === undefined) {
+    el.removeAttribute(name);
+  } else if (type === 'object' || type === 'function') {
+    el[name] = value;
+  } else {
+    el.setAttribute(name, value);
+  }
+
+  attrs[name] = value;
+};
+
+
+/**
+ * Applies a style to an Element. No vendor prefix expansion is done for
+ * property names/values.
+ * @param {!Element} el
+ * @param {string|Object<string,string>} style The style to set. Either a string
+ *     of css or an object containing property-value pairs.
+ */
+var applyStyle = function(el, style) {
+  if (typeof style === 'string' || style instanceof String) {
+    el.style.cssText = style;
+  } else {
+    el.style.cssText = '';
+
+    for (var prop in style) {
+      el.style[prop] = style[prop];
+    }
+  }
+};
+
+
+/**
+ * Updates a single attribute on an Element. For some types (e.g. id or class),
+ * the value is applied directly to the Element using the corresponding accessor
+ * function.
+ * @param {!Element} el
+ * @param {string} name The attribute's name.
+ * @param {*} value The attribute's value. If the value is a string, it is set
+ *     as an HTML attribute, otherwise, it is set on node.
+ */
+var updateAttribute = function(el, name, value) {
+  switch (name) {
+    case 'id':
+      el.id = value;
+      break;
+    case 'class':
+      el.className = value;
+      break;
+    case 'tabindex':
+      el.tabIndex = value;
+      break;
+    case 'style':
+      applyStyle(el, value);
+      break;
+    default:
+      applyAttr(el, name, value);
+      break;
+  }
+};
+
+
+/** */
+module.exports = {
+  updateAttribute: updateAttribute
+};
+
+
+},{"./node_data":11}],11:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/**
+ * Keeps track of information needed to perform diffs for a given DOM node.
+ * @param {?string} nodeName
+ * @param {?string} key
+ * @constructor
+ */
+function NodeData(nodeName, key) {
+  /**
+   * The attributes and their values.
+   * @const
+   */
+  this.attrs = {};
+
+  /**
+   * An array of attribute name/value pairs, used for quickly diffing the
+   * incomming attributes to see if the DOM node's attributes need to be
+   * updated.
+   * @const {Array<*>}
+   */
+  this.attrsArr = [];
+
+  /**
+   * The incoming attributes for this Node, before they are updated.
+   * @const {!Object<string, *>}
+   */
+  this.newAttrs = {};
+
+  /**
+   * The key used to identify this node, used to preserve DOM nodes when they
+   * move within their parent.
+   * @const
+   */
+  this.key = key;
+
+  /**
+   * Keeps track of children within this node by their key.
+   * {?Object<string, Node>}
+   */
+  this.keyMap = null;
+
+  /**
+   * The last child to have been visited within the current pass.
+   * {?Node}
+   */
+  this.lastVisitedChild = null;
+
+  /**
+   * The node name for this node.
+   * @const
+   */
+  this.nodeName = nodeName;
+
+  /**
+   * @const {string}
+   */
+  this.text = null;
+}
+
+
+/**
+ * Initializes a NodeData object for a Node.
+ *
+ * @param {!Node} node The node to initialze data for.
+ * @param {string} nodeName The node name of node.
+ * @param {?string} key The key that identifies the node.
+ * @return {!NodeData} The newly initialized data object
+ */
+var initData = function(node, nodeName, key) {
+  var data = new NodeData(nodeName, key);
+  node['__incrementalDOMData'] = data;
+  return data;
+};
+
+
+/**
+ * Retrieves the NodeData object for a Node, creating it if necessary.
+ *
+ * @param {!Node} node The node to retrieve the data for.
+ * @return {NodeData} The NodeData for this Node.
+ */
+var getData = function(node) {
+  var data = node['__incrementalDOMData'];
+
+  if (!data) {
+    var nodeName = node.nodeName.toLowerCase();
+    var key = null;
+
+    if (node instanceof Element) {
+      key = node.getAttribute('key');
+    }
+
+    data = initData(node, nodeName, key);
+  }
+
+  return data;
+};
+
+
+/** */
+module.exports = {
+  getData: getData,
+  initData: initData
+};
+
+
+},{}],12:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var updateAttribute = require('./attributes').updateAttribute;
+var nodeData = require('./node_data'),
+    getData = nodeData.getData,
+    initData = nodeData.initData;
+
+
+/**
+ * Creates an Element.
+ * @param {!Document} doc The document with which to create the Element.
+ * @param {string} tag The tag for the Element.
+ * @param {?string} key A key to identify the Element.
+ * @param {?Array<*>} statics An array of attribute name/value pairs of
+ *     the static attributes for the Element.
+ * @return {!Element}
+ */
+var createElement = function(doc, tag, key, statics) {
+  var el = doc.createElement(tag);
+  initData(el, tag, key);
+
+  if (statics) {
+    for (var i = 0; i < statics.length; i += 2) {
+      updateAttribute(el, statics[i], statics[i + 1]);
+    }
+  }
+
+  return el;
+};
+
+/**
+ * Creates a Text.
+ * @param {!Document} doc The document with which to create the Text.
+ * @param {string} text The intial content of the Text.
+ * @return {!Text}
+ */
+var createTextNode = function(doc, text) {
+  var node = doc.createTextNode(text);
+  getData(node).text = text;
+
+  return node;
+};
+
+
+/**
+ * Creates a Node, either a Text or an Element depending on the node name
+ * provided.
+ * @param {!Document} doc The document with which to create the Node.
+ * @param {string} nodeName The tag if creating an element or #text to create
+ *     a Text.
+ * @param {?string} key A key to identify the Element.
+ * @param {?Array<*>|string} statics The static data to initialize the Node
+ *     with. For an Element, an array of attribute name/value pairs of
+ *     the static attributes for the Element. For a Text, a string with the
+ *     intial content of the Text.
+ * @return {!Node}
+ */
+var createNode = function(doc, nodeName, key, statics) {
+  if (nodeName === '#text') {
+    return createTextNode(doc, statics);
+  }
+
+  return createElement(doc, nodeName, key, statics);
+};
+
+
+/**
+ * Creates a mapping that can be used to look up children using a key.
+ * @param {!Element} el
+ * @return {!Object<string, !Node>} A mapping of keys to the children of the
+ *     Element.
+ */
+var createKeyMap = function(el) {
+  var map = {};
+  var children = el.children;
+  var count = children.length;
+
+  for (var i = 0; i < count; i += 1) {
+    var child = children[i];
+    var key = getKey(child);
+
+    if (key) {
+      map[key] = child;
+    }
+  }
+
+  return map;
+};
+
+
+/**
+ * @param {?Node} node A node to get the key for.
+ * @return {?string} The key for the Node, if applicable.
+ */
+var getKey = function(node) {
+  return getData(node).key;
+};
+
+
+/**
+ * @param {?Node} node A node to get the node name for.
+ * @return {?string} The node name for the Node, if applicable.
+ */
+var getNodeName = function(node) {
+  return getData(node).nodeName;
+};
+
+
+/**
+ * Retrieves the mapping of key to child node for a given Element, creating it
+ * if necessary.
+ * @param {!Element} el
+ * @return {!Object<string,!Node>} A mapping of keys to child Nodes
+ */
+var getKeyMap = function(el) {
+  var data = getData(el);
+
+  if (!data.keyMap) {
+    data.keyMap = createKeyMap(el);
+  }
+
+  return data.keyMap;
+};
+
+
+/**
+ * Retrieves a child from the parent with the given key.
+ * @param {!Element} parent
+ * @param {?string} key
+ * @return {?Node} The child corresponding to the key.
+ */
+var getChild = function(parent, key) {
+  return getKeyMap(parent)[key];
+};
+
+
+/**
+ * Registers a node as being a child. If a key is provided, the parent will
+ * keep track of the child using the key. The child can be retrieved using the
+ * same key using getKeyMap. The provided key should be unique within the
+ * parent Element.
+ * @param {!Element} parent The parent of child.
+ * @param {?string} key A key to identify the child with.
+ * @param {!Node} child The child to register.
+ */
+var registerChild = function(parent, key, child) {
+  if (key) {
+    getKeyMap(parent)[key] = child;
+  }
+};
+
+
+/** */
+module.exports = {
+  createNode: createNode,
+  getKey: getKey,
+  getNodeName: getNodeName,
+  getChild: getChild,
+  registerChild: registerChild
+};
+
+
+},{"./attributes":10,"./node_data":11}],13:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var traversal = require('./traversal'),
+    firstChild = traversal.firstChild,
+    parentNode = traversal.parentNode;
+var TreeWalker = require('./tree_walker');
+var walker = require('./walker'),
+    getWalker = walker.getWalker,
+    setWalker = walker.setWalker;
+
+
+/**
+ * Patches the document starting at el with the provided function. This function
+ * may be called during an existing patch operation.
+ * @param {!Element} el the element to patch
+ * @param {!function} fn A function containing elementOpen/elementClose/etc.
+ *     calls that describe the DOM.
+ */
+var patch = function(el, fn) {
+  var prevWalker = getWalker();
+  setWalker(new TreeWalker(el));
+
+  firstChild();
+  fn();
+  parentNode();
+
+  setWalker(prevWalker);
+};
+
+
+/** */
+module.exports = {
+  patch: patch
+};
+
+
+},{"./traversal":14,"./tree_walker":15,"./walker":17}],14:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var getWalker = require('./walker').getWalker;
+var getData = require('./node_data').getData;
+
+
+/**
+ * Enters a Element, clearing out the last visited child field.
+ * @param {!Element} node
+ */
+var enterNode = function(node) {
+  var data = getData(node);
+  data.lastVisitedChild = null;
+};
+
+
+/**
+ * Clears out any unvisited Nodes, as the corresponding virtual element
+ * functions were never called for them.
+ * @param {!Element} node
+ */
+var exitNode = function(node) {
+  var data = getData(node);
+  var lastVisitedChild = data.lastVisitedChild;
+
+  if (node.lastChild === lastVisitedChild) {
+    return;
+  }
+
+  while (node.lastChild !== lastVisitedChild) {
+    node.removeChild(node.lastChild);
+  }
+
+  // Invalidate the key map since we removed children. It will get recreated
+  // next time we need it.
+  data.keyMap = null;
+};
+
+
+/**
+ * Marks a parent as having visited a child.
+ * @param {!Element} parent
+ * @param {!Node} child
+ */
+var markVisited = function(parent, child) {
+  var data = getData(parent);
+  data.lastVisitedChild = child;
+};
+
+
+/**
+ * Changes to the first child of the current node.
+ */
+var firstChild = function() {
+  var walker = getWalker();
+  enterNode(walker.currentNode);
+  walker.firstChild();
+};
+
+
+/**
+ * Changes to the next sibling of the current node.
+ */
+var nextSibling = function() {
+  var walker = getWalker();
+  walker.nextSibling();
+};
+
+
+/**
+ * Changes to the parent of the current node, removing any unvisited children.
+ */
+var parentNode = function() {
+  var walker = getWalker();
+  walker.parentNode();
+  exitNode(walker.currentNode);
+};
+
+
+/** */
+module.exports = {
+  firstChild: firstChild,
+  nextSibling: nextSibling,
+  parentNode: parentNode,
+  markVisited: markVisited
+};
+
+
+},{"./node_data":11,"./walker":17}],15:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * Similar to the built-in Treewalker class, but simplified and allows direct
+ * access to modify the currentNode property.
+ * @param {!Node} node The root Node of the subtree the walker should start
+ *     traversing.
+ * @constructor
+ */
+function TreeWalker(node) {
+  /**
+   * Keeps track of the current parent node. This is necessary as the traversal
+   * methods may traverse past the last child and we still need a way to get
+   * back to the parent.
+   * @const @private {!Array<!Node>}
+   */
+  this.stack_ = [];
+
+  /** {?Node} */
+  this.currentNode = node;
+
+  /** {!Document} */
+  this.doc = node.ownerDocument;
+}
+
+
+/**
+ * @return {!Node} The current parent of the current location in the subtree.
+ */
+TreeWalker.prototype.getCurrentParent = function() {
+  return this.stack_[this.stack_.length - 1];
+};
+
+
+/**
+ * Changes the current location the firstChild of the current location.
+ */
+TreeWalker.prototype.firstChild = function() {
+  this.stack_.push(this.currentNode);
+  this.currentNode = this.currentNode.firstChild;
+};
+
+
+/**
+ * Changes the current location the nextSibling of the current location.
+ */
+TreeWalker.prototype.nextSibling = function() {
+  this.currentNode = this.currentNode.nextSibling;
+};
+
+
+/**
+ * Changes the current location the parentNode of the current location.
+ */
+TreeWalker.prototype.parentNode = function() {
+  this.currentNode = this.stack_.pop();
+};
+
+
+/** */
+module.exports = TreeWalker;
+
+
+},{}],16:[function(require,module,exports){
+(function (process){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+var alignWithDOM = require('./alignment').alignWithDOM;
+var updateAttribute = require('./attributes').updateAttribute;
+var getData = require('./node_data').getData;
+var getWalker = require('./walker').getWalker;
+var traversal = require('./traversal'),
+    firstChild = traversal.firstChild,
+    nextSibling = traversal.nextSibling,
+    parentNode = traversal.parentNode;
+
+
+/**
+ * The offset in the virtual element declaration where the attributes are
+ * specified.
+ * @const
+ */
+var ATTRIBUTES_OFFSET = 3;
+
+
+/**
+ * Builds an array of arguments for use with elementOpenStart, attr and
+ * elementOpenEnd.
+ * @type {Array<*>}
+ * @const
+ */
+var argsBuilder = [];
+
+
+if (process.env.NODE_ENV !== 'production') {
+  /**
+   * Keeps track whether or not we are in an attributes declaration (after
+   * elementOpenStart, but before elementOpenEnd).
+   * @type {boolean}
+   */
+  var inAttributes = false;
+
+
+  /** Makes sure that the caller is not where attributes are expected. */
+  var assertNotInAttributes = function() {
+    if (inAttributes) {
+      throw new Error('Was not expecting a call to attr or elementOpenEnd, ' +
+          'they must follow a call to elementOpenStart.');
+    }
+  };
+
+
+  /** Makes sure that the caller is where attributes are expected. */
+  var assertInAttributes = function() {
+    if (!inAttributes) {
+      throw new Error('Was expecting a call to attr or elementOpenEnd. ' +
+          'elementOpenStart must be followed by zero or more calls to attr, ' +
+          'then one call to elementOpenEnd.');
+    }
+  };
+
+
+  /** Updates the state to being in an attribute declaration. */
+  var setInAttributes = function() {
+    inAttributes = true;
+  };
+
+
+  /** Updates the state to not being in an attribute declaration. */
+  var setNotInAttributes = function() {
+    inAttributes = false;
+  };
+}
+
+
+/**
+ * Checks to see if one or more attributes have changed for a given
+ * Element. When no attributes have changed, this function is much faster than
+ * checking each individual argument. When attributes have changed, the overhead
+ * of this function is minimal.
+ *
+ * This function is called in the context of the Element and the arguments from
+ * elementOpen-like function so that the arguments are not de-optimized.
+ *
+ * @this {Element} The Element to check for changed attributes.
+ * @param {*} unused1
+ * @param {*} unused2
+ * @param {*} unused3
+ * @param {...*} var_args Attribute name/value pairs of the dynamic attributes
+ *     for the Element.
+ * @return {boolean} True if the Element has one or more changed attributes,
+ *     false otherwise.
+ */
+var hasChangedAttrs = function(unused1, unused2, unused3, var_args) {
+  var data = getData(this);
+  var attrsArr = data.attrsArr;
+  var attrsChanged = false;
+  var i;
+
+  for (i = ATTRIBUTES_OFFSET; i < arguments.length; i += 2) {
+    // Translate the from the arguments index (for values) to the attribute's
+    // ordinal. The attribute values are at arguments index 3, 5, 7, etc. To get
+    // the ordinal, need to subtract the offset and divide by 2
+    if (attrsArr[(i - ATTRIBUTES_OFFSET) >> 1] !== arguments[i + 1]) {
+      attrsChanged = true;
+      break;
+    }
+  }
+
+  if (attrsChanged) {
+    for (i = ATTRIBUTES_OFFSET; i < arguments.length; i += 2) {
+      attrsArr[(i - ATTRIBUTES_OFFSET) >> 1] = arguments[i + 1];
+    }
+  }
+
+  return attrsChanged;
+};
+
+
+/**
+ * Updates the newAttrs object for an Element.
+ *
+ * This function is called in the context of the Element and the arguments from
+ * elementOpen-like function so that the arguments are not de-optimized.
+ *
+ * @this {Element} The Element to update newAttrs for.
+ * @param {*} unused1
+ * @param {*} unused2
+ * @param {*} unused3
+ * @param {...*} var_args Attribute name/value pairs of the dynamic attributes
+ *     for the Element.
+ * @return {!Object<string, *>} The updated newAttrs object.
+ */
+var updateNewAttrs = function(unused1, unused2, unused3, var_args) {
+  var node = this;
+  var data = getData(node);
+  var newAttrs = data.newAttrs;
+
+  for (var attr in newAttrs) {
+    newAttrs[attr] = undefined;
+  }
+
+  for (var i = ATTRIBUTES_OFFSET; i < arguments.length; i += 2) {
+    newAttrs[arguments[i]] = arguments[i + 1];
+  }
+
+  return newAttrs;
+};
+
+
+/**
+ * Updates the attributes for a given Element.
+ * @param {!Element} node
+ * @param {!Object<string,*>} newAttrs The new attributes for node
+ */
+var updateAttributes = function(node, newAttrs) {
+  for (var attr in newAttrs) {
+    updateAttribute(node, attr, newAttrs[attr]);
+  }
+};
+
+
+/**
+ * Declares a virtual Element at the current location in the document. This
+ * corresponds to an opening tag and a elementClose tag is required.
+ * @param {string} tag The element's tag.
+ * @param {?string} key The key used to identify this element. This can be an
+ *     empty string, but performance may be better if a unique value is used
+ *     when iterating over an array of items.
+ * @param {?Array<*>} statics An array of attribute name/value pairs of the
+ *     static attributes for the Element. These will only be set once when the
+ *     Element is created.
+ * @param {...*} var_args Attribute name/value pairs of the dynamic attributes
+ *     for the Element.
+ */
+var elementOpen = function(tag, key, statics, var_args) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes();
+  }
+
+  var node = alignWithDOM(tag, key, statics);
+
+  if (hasChangedAttrs.apply(node, arguments)) {
+    var newAttrs = updateNewAttrs.apply(node, arguments);
+    updateAttributes(node, newAttrs);
+  }
+
+  firstChild();
+};
+
+
+/**
+ * Declares a virtual Element at the current location in the document. This
+ * corresponds to an opening tag and a elementClose tag is required. This is
+ * like elementOpen, but the attributes are defined using the attr function
+ * rather than being passed as arguments. Must be folllowed by 0 or more calls
+ * to attr, then a call to elementOpenEnd.
+ * @param {string} tag The element's tag.
+ * @param {?string} key The key used to identify this element. This can be an
+ *     empty string, but performance may be better if a unique value is used
+ *     when iterating over an array of items.
+ * @param {?Array<*>} statics An array of attribute name/value pairs of the
+ *     static attributes for the Element. These will only be set once when the
+ *     Element is created.
+ */
+var elementOpenStart = function(tag, key, statics) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes();
+    setInAttributes();
+  }
+
+  argsBuilder[0] = tag;
+  argsBuilder[1] = key;
+  argsBuilder[2] = statics;
+  argsBuilder.length = ATTRIBUTES_OFFSET;
+};
+
+
+/***
+ * Defines a virtual attribute at this point of the DOM. This is only valid
+ * when called between elementOpenStart and elementOpenEnd.
+ *
+ * @param {string} name
+ * @param {*} value
+ */
+var attr = function(name, value) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertInAttributes();
+  }
+
+  argsBuilder.push(name, value);
+};
+
+
+/**
+ * Closes an open tag started with elementOpenStart.
+ */
+var elementOpenEnd = function() {
+  if (process.env.NODE_ENV !== 'production') {
+    assertInAttributes();
+    setNotInAttributes();
+  }
+
+  elementOpen.apply(null, argsBuilder);
+};
+
+
+/**
+ * Closes an open virtual Element.
+ *
+ * @param {string} tag The element's tag.
+ */
+var elementClose = function(tag) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes();
+  }
+
+  parentNode();
+  nextSibling();
+};
+
+
+/**
+ * Declares a virtual Element at the current location in the document that has
+ * no children.
+ * @param {string} tag The element's tag.
+ * @param {?string} key The key used to identify this element. This can be an
+ *     empty string, but performance may be better if a unique value is used
+ *     when iterating over an array of items.
+ * @param {?Array<*>} statics An array of attribute name/value pairs of the
+ *     static attributes for the Element. These will only be set once when the
+ *     Element is created.
+ * @param {...*} var_args Attribute name/value pairs of the dynamic attributes
+ *     for the Element.
+ */
+var elementVoid = function(tag, key, statics, var_args) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes();
+  }
+
+  elementOpen.apply(null, arguments);
+  elementClose.apply(null, arguments);
+};
+
+
+/**
+ * Declares a virtual Text at this point in the document.
+ *
+ * @param {string} value The text of the Text.
+ */
+var text = function(value) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes();
+  }
+
+  var node = alignWithDOM('#text', null, value);
+  var data = getData(node);
+
+  if (data.text !== value) {
+    node.data = value;
+    data.text = value;
+  }
+
+  nextSibling();
+};
+
+
+/** */
+module.exports = {
+  elementOpenStart: elementOpenStart,
+  elementOpenEnd: elementOpenEnd,
+  elementOpen: elementOpen,
+  elementVoid: elementVoid,
+  elementClose: elementClose,
+  text: text,
+  attr: attr
+};
+
+
+}).call(this,require('_process'))
+
+},{"./alignment":9,"./attributes":10,"./node_data":11,"./traversal":14,"./walker":17,"_process":6}],17:[function(require,module,exports){
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * @type {TreeWalker}
+ */
+var walker_;
+
+
+/**
+ * @return {TreeWalker} the current TreeWalker
+ */
+var getWalker = function() {
+  return walker_;
+};
+
+
+/**
+ * Sets the current TreeWalker
+ * @param {TreeWalker} walker
+ */
+var setWalker = function(walker) {
+  walker_ = walker;
+};
+
+
+/** */
+module.exports = {
+  getWalker: getWalker,
+  setWalker: setWalker
+};
+
+
+},{}],18:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -572,7 +2155,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],4:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 (function (global){
 /**
  * @license
@@ -12928,77 +14511,61 @@ if (typeof Object.create === 'function') {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],5:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 
 var _ = require('lodash');
 var inherits = require('inherits');
-var fastdom = require('fastdom');
-
-var t = document.createElement('template');
-var templateSupport = 'content' in t;
-
-// utils
-function strToFrag(strHTML){
-    if( templateSupport ){
-        var temp=document.createElement('template');
-        temp.innerHTML=strHTML;
-        return temp.content;
-    }
-
-    var parser = new DOMParser(),
-    doc = parser.parseFromString(strHTML, "text/xml"),
-    documentFragment = document.createDocumentFragment() ;
-    documentFragment.appendChild( doc.documentElement );
-    return documentFragment;
-}
+var idom = require('incremental-dom');
+var patch = idom.patch;
+var open = idom.elementOpen;
+var close = idom.elementClose;
+var v = idom.elementVoid;
+var text = idom.text;
 
 function View(options) {
     options = options || {};
-    
-    this.regions = [];
     this.root = null;
-    this.count = 1;
-    this.id = options.id || 'test';
+    this.options = options;
 
-    this.compiled = _.template(this.template);
-    this.render();
+    this.count = 0;
 }
 
 module.exports = View;
 
-View.prototype.data = function(){};
+View.prototype.data = function() {};
 
-View.prototype.render = function() {
-    //console.time('render')
-    var el = document.createElement('div');
-    el.id = this.id;
-    el.className = 'box-view';
-    el.appendChild(strToFrag(this.compiled(this.data())))
-    this.root = el;
-    //console.timeEnd('render')
+View.prototype.attributes = function() {
+    return {};
 }
 
-View.prototype.refresh = function() {
-    //console.time('refresh')
-    /*var frag = strToFrag(this.compiled(this.data()));
+View.prototype.setAttributes = function() {
+    var attrs = _.extend({}, _.result(this, 'attributes'));
+    for (var attr in attrs) {
+        attr in this.root ? this.root[attr] = attrs[attr] : this.root.setAttribute(attr, attrs[attr]);
+    }
+}
 
-    this.regions.forEach(function(region) {
-        var node = frag.querySelector(region.selector);
-        var children = node.childNodes;
-        if (children.length === 0) {
-            node.innerHTML = '';
-        }
-        region.instance.attach(node);
-    }.bind(this));
+View.prototype.template = function(data) {
+    var count = this.count += 1;
+    _.each(_.range(10), function(i) {
+        open('div', i, ['class', 'box'], 'id', 'box-' + i);
+        text(count % 100);
+        close('div');
+    }, this);
+};
 
-    this.root.innerHTML = '';
-    this.root.appendChild(frag);*/
-    //console.timeEnd('refresh');
-    this.root.innerHTML = this.compiled(this.data());
+View.prototype.render = function() {
+    if (this.root === null) {
+        this.root = document.createElement(_.result(this, 'tagName', 'div'));
+        this.setAttributes()
+    }
+
+    patch(this.root, this.template.bind(this), this.data);
 }
 
 View.prototype.attach = function(container) {
+    this.render();
     container.appendChild(this.root);
 }
 
@@ -13015,40 +14582,289 @@ View.prototype.destroy = function() {
     this.root = null;
 }
 
-View.prototype.region = function(view, selector) {
-    var node = this.root.querySelector(selector);
-    var children = node.childNodes;
+},{"incremental-dom":8,"inherits":18,"lodash":19}],21:[function(require,module,exports){
+'use strict';
 
-    if (node) {
-        var region = _.find(this.regions, {node: node});
-        if (region) {
-            var index = this.regions.indexOf(region);
-            region.instance.destroy();
-            if (index > -1) {
-                this.regions[index] = {
-                    selector: selector,
-                    instance: view,
-                    node: node
-                };
-            }
-        } else {
-            if (children.length === 0) {
-                node.innerHTML = '';
-            }
-            this.regions.push({
-                selector: selector,
-                instance: view,
-                node: node
-            });
-        }
+var _ = require('lodash');
+var t = document.createElement('template');
+var templateSupport = 'content' in t;
+var delegateEventSplitter = /^(\S+)\s*(.*)$/;
+var parser = new DOMParser();
+var noop = function () {
+};
 
-        view.attach(node);
+// Caches a local reference to `Element.prototype` for faster access.
+var ElementProto = (typeof Element !== 'undefined' && Element.prototype) || {};
+
+// Find the right `Element#matches` for IE>=9 and modern browsers.
+var matchesSelector = ElementProto.matches ||
+    ElementProto.webkitMatchesSelector ||
+    ElementProto.mozMatchesSelector ||
+    ElementProto.msMatchesSelector ||
+    ElementProto.oMatchesSelector ||
+
+        // Make our own `Element#matches` for IE8
+    function (selector) {
+        // Use querySelectorAll to find all elements matching the selector,
+        // then check if the given element is included in that list.
+        // Executing the query on the parentNode reduces the resulting nodeList,
+        // (document doesn't have a parentNode).
+        var nodeList = (this.parentNode || document).querySelectorAll(selector) || [];
+        return ~indexOf(nodeList, this);
+    };
+
+// utils
+function strToFrag(strHTML) {
+    if (templateSupport) {
+        t = document.createElement('template');
+        t.innerHTML = strHTML;
+        return t.content;
     } else {
-        console.warn('couldn find node in this view')
+        var documentFragment = document.createDocumentFragment();
+        var doc = parser.parseFromString(strHTML, 'text/xml');
+        documentFragment.appendChild(doc.documentElement);
+        return documentFragment;
     }
 }
 
-},{"fastdom":2,"inherits":3,"lodash":4}]},{},[1])
+function addView(view, selector) {
+    var index = _.findIndex(this.views, function (subview) {
+        return subview.instance === view;
+    });
+
+    if (index > -1) {
+        return;
+    } else {
+        this.views.push({
+            selector: selector,
+            instance: view
+        });
+    }
+}
+
+function View(options) {
+    options = options || {};
+    this.cid = _.uniqueId('view_');
+    this.options = options;
+    this.regions = [];
+    this.views = [];
+    this.root = null;
+    this.raf = null;
+    this.compiled = this.template;
+}
+
+module.exports = View;
+
+View.prototype.data = noop;
+
+View.prototype.template = noop;
+
+View.prototype.attributes = noop;
+
+View.prototype.addViews = noop;
+
+View.prototype.beforeRender = null;
+
+View.prototype.afterRender = null;
+
+View.prototype.setAttributes = function () {
+    var attrs = _.extend({}, _.result(this, 'attributes'));
+    for (var attr in attrs) {
+        attr in this.root ? this.root[attr] = attrs[attr] : this.root.setAttribute(attr, attrs[attr]);
+    }
+}
+
+View.prototype.render = function (force) {
+    window.cancelAnimationFrame(this.raf);
+    // reset all sub views
+    //this.cleanViews();
+    //console.debug('Render ' + this.cid, this.views);
+    if (this.root === null) {
+        //console.log(this.cid, 'render with root');
+        this.root = document.createElement(_.result(this, 'tagName', 'div'));
+        this.setAttributes();
+        this.delegateEvents();
+        this.addViews.call(this, addView.bind(this));
+    }
+
+    this.root.innerHTML = '';
+    if (force && this.root !== null) {
+        this.cleanViews();
+        this.addViews.call(this, addView.bind(this));
+    }
+
+    var frag = strToFrag(this.compiled(_.result(this, 'data', {})));
+    this.views.forEach(function (view) {
+        var node = frag.querySelector(view.selector);
+        if (node) {
+            view.instance.attach(node);
+        } else {
+            //debugger;
+            console.warn(this.cid + ' - no node found for view selector: ' + view.selector);
+        }
+    }.bind(this));
+
+    this.regions.forEach(function (region) {
+        var node = frag.querySelector(region.selector);
+        if (node) {
+            region.node = node;
+            region.instance.attach(node, true);
+        }
+    }.bind(this));
+
+    if(this.beforeRender){
+        this.beforeRender(frag)
+    }
+
+    this.root.appendChild(frag);
+
+    if(this.afterRender){
+        this.raf = window.requestAnimationFrame(this.afterRender.bind(this));
+    }
+    return this;
+}
+
+View.prototype.attach = function (container, force) {
+    if (!this.root) {
+        this.render()
+    }
+
+    if (force) {
+        container.innerHTML = '';
+    }
+
+    container.appendChild(this.root);
+    return this;
+}
+
+View.prototype.remove = function () {
+    if (this.root && this.root.parentNode) {
+        this.root.parentNode.removeChild(this.root);
+    } else {
+        console.warn(this.cid + ' - Why are you removing if you didnt attach ?? ');
+    }
+}
+
+View.prototype.destroy = function () {
+    console.warn(this.cid + ' - DESTROY ', this.template)
+    window.cancelAnimationFrame(this.raf);
+    this.remove();
+    this.cleanViews();
+    this.root = null;
+}
+
+View.prototype.region = function (view, selector) {
+    var node;
+    var children;
+
+    if (this.root) {
+        node = this.root.querySelector(selector);
+        if (node) {
+            var region = _.find(this.regions, {node: node});
+
+            if (region) {
+                // bail out if its the same instance
+                if (region.instance === view) {
+                    return;
+                }
+
+                // swap the region for this node
+                var index = this.regions.indexOf(region);
+                region.instance.destroy();
+                if (index > -1) {
+                    this.regions[index] = {
+                        selector: selector,
+                        instance: view,
+                        node    : node
+                    };
+                }
+            } else {
+                // add region for this node
+                this.regions.push({
+                    selector: selector,
+                    instance: view,
+                    node    : node
+                });
+            }
+
+            // attach region view to the node
+            view.attach(node, true);
+        } else {
+            console.warn('couldn find node in this view with select : ' + selector)
+        }
+    } else {
+        var regionIndex = _.findIndex(this.regions, function (region) {
+            return region.instance === view;
+        });
+        var selectorIndex = _.findIndex(this.regions, function (region) {
+            return region.selector === selector;
+        });
+
+        // same instance ignore
+        if (regionIndex > -1) {
+            return;
+        } else {
+            // same selector swap
+            if (selectorIndex > -1) {
+                this.regions[selectorIndex].instance.destroy();
+                this.regions[selectorIndex] = {
+                    selector: selector,
+                    instance: view,
+                    node    : null
+                }
+            } else {
+                // The view isnt rendered yet so just add the region without attaching
+                this.regions.push({
+                    selector: selector,
+                    instance: view,
+                    node    : null
+                });
+            }
+        }
+    }
+}
+
+View.prototype.cleanViews = function () {
+    this.views.forEach(function (view) {
+        view.instance.destroy();
+    });
+    this.views = [];
+}
+
+View.prototype.delegateEvents = function () {
+    var events = _.result(this, 'events', {});
+
+    for (var key in events) {
+        var method = events[key];
+        if (!_.isFunction(method)) method = this[method];
+        if (!method) continue;
+        var match = key.match(delegateEventSplitter);
+        this.delegate(match[1], match[2], method.bind(this));
+    }
+
+    return this;
+};
+
+View.prototype.delegate = function (eventName, selector, listener) {
+    if (typeof selector === 'function') {
+        listener = selector;
+        selector = null;
+    }
+    var root = this.root;
+    var handler = selector ? function (e) {
+        var node = e.target || e.srcElement;
+        for (; node && node != root; node = node.parentNode) {
+            if (matchesSelector.call(node, selector)) {
+                e.delegateTarget = node;
+                listener(e);
+            }
+        }
+    } : listener;
+
+    this.root.addEventListener(eventName, handler, false);
+}
+
+},{"lodash":19}]},{},[1])
 
 
 //# sourceMappingURL=script.js.map
