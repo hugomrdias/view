@@ -20,7 +20,7 @@
     "incremental-dom": "^0.1.0",
     "inherits": "^2.0.1",
     "jstify": "^0.11.0",
-    "lodash": "^3.10.0",
+    "lodash": "^4.17.19",
     "pretty-hrtime": "^1.0.0",
     "vinyl-buffer": "^1.0.0",
     "vinyl-source-stream": "^1.1.0",
